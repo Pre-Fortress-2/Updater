@@ -276,7 +276,7 @@ def update() -> bool:
                     update_log.write( "Added: " + relative_path + '\n' )
                 # Add the file
                 copy2( os.path.join( replacement_path, relative_path ), os.path.join( sourcemod_path, relative_path ) )
-                success = True
+            success = True
     except Exception as error:
         print( 'An exception has occurred: ', error )
 
