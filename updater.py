@@ -89,8 +89,11 @@ def setupsourcemodpath() -> None:
 def check_for_update() -> int:
     '''
     Check if we need an update.
-    Return 0 if we don't need an update, 1 if we do, and 2 if we do and was 
-    an interrupted update, either by closing out prematurely or a program error.
+    returns UpdateCode.NO_UPDATE if we don't need an update, 
+    returns UpdateCode.NEEDS_UPDATE if we do
+    returns UpdateCode.NEEDS_UPDATE_INTERRUPTED if we were in the middle of an update 
+    but was cancelled due to an error or was closed out prematurely
+    returns UpdateCode.PROMPT_DOWNLOAD if we don't have the game installed
     '''
     # Traverse to the PF2 path
     sourcemod_path = os.path.join( SOURCEMOD_PATH, 'pf2' )
@@ -163,7 +166,7 @@ def download() -> bool:
     '''
     global FILE_URL
     try:
-
+        # If this file already exists, delete it
         if os.path.exists( os.path.join( TEMP_PATH, 'latest.tar.gz' ) ):
             os.remove( os.path.join( TEMP_PATH, 'latest.tar.gz' ) )
     
@@ -228,6 +231,7 @@ def update() -> bool:
     sourcemod_path = os.path.join( SOURCEMOD_PATH , "pf2" ) 
     # temp path, connect to the internet to get the patch from later
     diff_path = ''
+    # TEMPORARY TEMPORARY IDEALLY SUPPOSED TO BE PULLED OFF OF A SERVER
     if system() == 'Windows':
         diff_path = 'E:\\Downloads\\pf2_0' + str( LOCAL_VERSION ) + '-0' + str( SERVER_VERSION ) + '.patch'
     else:
@@ -238,6 +242,7 @@ def update() -> bool:
     file = None
     # Have a file to tell you if an update was cancelled in the middle, then delete it when completely done.
     # Stores data about what version (72-73 as 0.7.2-0.7.3 for example) we were updating from 
+    # If we have a DEBUG flag set, generate more information about the update.
     try:
         update_log = open( os.path.join( sourcemod_path, 'update_file' ), 'w' ) 
         update_log.write( str( LOCAL_VERSION ) + '-' + str( SERVER_VERSION ) + '\n' )
@@ -253,25 +258,25 @@ def update() -> bool:
                 relative_path = mod_file.path.partition( '/' )[2].partition('/')[2]
                 if DEBUG:
                     update_log.write( "Modified: " + relative_path + '\n' )
+                # Update this file with the replacement one
                 copy2( os.path.join( replacement_path, relative_path ), os.path.join( sourcemod_path, relative_path ) )
             for rem_file in diff_file.removed_files:
                 # Get the relative path so we can easily join the new folder with the old folder.
                 relative_path = rem_file.path.partition( '/' )[2].partition('/')[2]
                 if DEBUG:
                     update_log.write( "Removed: " + relative_path + '\n' )
+                # Remove this file.
                 os.remove( os.path.join( sourcemod_path, relative_path ) )
             for added_file in diff_file.added_files:
                 # Get the relative path so we can easily join the new folder with the old folder.
                 relative_path = added_file.path.partition( '/' )[2].partition('/')[2]
                 if DEBUG:
                     update_log.write( "Added: " + relative_path + '\n' )
+                # Add the file
                 copy2( os.path.join( replacement_path, relative_path ), os.path.join( sourcemod_path, relative_path ) )
                 success = True
     except Exception as error:
-        print( 'line 254: An exception has occurred: ', error )
-    finally:
-        file.close()
-        update_log.close()
+        print( 'An exception has occurred: ', error )
 
     return success
 
@@ -280,20 +285,30 @@ def continue_update() -> bool:
     '''
     Function to set up variables so that the update can be continued. 
     '''
+    # Get the global variables
     global LOCAL_VERSION
     global SERVER_VERSION
 
+    # Get the pf2 path
     sourcemod_path = os.path.join( SOURCEMOD_PATH, 'pf2' )
+    # Get the update file so we can continue updating
     update_file = open( os.path.join( sourcemod_path, 'update_file' ) )
+    # Read the update file.
     buffer = update_file.readlines()
+    # Extract the versions from the first line
     version = buffer[0].partition('-')
+    # Set the variables
     LOCAL_VERSION = int( version[0] )
     SERVER_VERSION = int ( version[2] ) 
-
+    # Continue updating.
     return update() 
 
 
 def copy_to_destination( destination_path: str ) -> bool:
+    '''
+    Function to download PF2 into the sourcemods folder if it's not true.
+    True if it was done successfully, False if something went wrong
+    '''
     print( 'Extracting Pre-Fortress 2 to the sourcemods folder...' )
     success = False
     try:
@@ -306,6 +321,9 @@ def copy_to_destination( destination_path: str ) -> bool:
         
 
 def cleanup() -> None:
+    '''
+    Function to clean up some files after we're done with them
+    '''
     sourcemod_path = os.path.join( SOURCEMOD_PATH, 'pf2' )
     os.remove( os.path.join( sourcemod_path, 'update_file' ) )
     os.remove( os.path.join( TEMP_PATH, 'pf2_new' ) ) 
@@ -315,9 +333,12 @@ def start() -> None:
     # set up the global variables.
     setupsourcemodpath()
 
+    # Check for an update and check the update code with it
     match check_for_update():
+        # Don't do anything if we don't need an update.
         case UpdateCode.NO_UPDATE:
             return
+        # Needs update, download and extract the latest build and apply changes 
         case UpdateCode.NEEDS_UPDATE: 
             if not download():
                 print('no download')
@@ -328,22 +349,32 @@ def start() -> None:
             if not update():
                 print('no update')
                 return
+        # The update was interrupted, continue
         case UpdateCode.NEEDS_UPDATE_INTERRUPTED:
-            continue_update()
+            if not continue_update():
+                print('no update')
+                return
+        # Should we download the game if it is installed?
         case UpdateCode.PROMPT_DOWNLOAD:
-            if message.message_yes_no('Pre-Fortress 2 is not installed. Do you wish to download the game in your sourcemods folder?'):
+            # Ask the user if they want to download the game.
+            if message.message_yes_no('Pre-Fortress 2 is not installed. Do you wish to download the game to your sourcemods folder?'):
+                # Download the game
                 if not download():
                     print('no download')
                     return
+                # Extract the game
                 if not extract():
                     print('no extract')
                     return
+                # Download the game to the sourcemod path.
                 if not copy_to_destination( os.path.join( SOURCEMOD_PATH, 'pf2' ) ):
                     print('no copy')
                     return
-    
+                
+    # Clean up the files we left behind if any
     cleanup()
 
 
 if __name__ == "__main__":
+    # Start the program if we executed this script
     start()
