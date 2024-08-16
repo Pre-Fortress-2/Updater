@@ -199,6 +199,7 @@ def extract() -> bool:
     '''
     Extracts the tar file into a new folder.
     '''
+    print('Extracting the game...')
     # Flag to indicate success.
     success = False
     try:
@@ -230,6 +231,7 @@ def update() -> bool:
     via a diff file downloaded from the server.
     This assumes the downloaded game was already extracted and updates files from it.
     '''
+    print('Applying the update...')
     sourcemod_path = os.path.join( SOURCEMOD_PATH , "pf2" ) 
     # temp path, connect to the internet to get the patch from later
     diff_path = ''
@@ -339,6 +341,7 @@ def start() -> None:
     match check_for_update():
         # Don't do anything if we don't need an update.
         case UpdateCode.NO_UPDATE:
+            print( 'Your game is already up to date. Goodbye!' )
             return
         # Needs update, download and extract the latest build and apply changes 
         case UpdateCode.NEEDS_UPDATE: 
