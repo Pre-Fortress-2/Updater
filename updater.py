@@ -9,9 +9,11 @@ import tarfile
 import vpk # we need to determine the version file from the VPK
 if system() == 'Windows':
     import winreg
+    import userpaths # Get the downloads folder on windows 
 import unidiff
 from shutil import copy2, rmtree, copytree
 from enum import Enum
+
 import message
 
 # Debug flag.
@@ -231,9 +233,9 @@ def update() -> bool:
     sourcemod_path = os.path.join( SOURCEMOD_PATH , "pf2" ) 
     # temp path, connect to the internet to get the patch from later
     diff_path = ''
-    # TEMPORARY TEMPORARY IDEALLY SUPPOSED TO BE PULLED OFF OF A SERVER
+    # TEMPORARY TEMPORARY SUPPOSED TO BE PULLED OFF OF A SERVER
     if system() == 'Windows':
-        diff_path = 'E:\\Downloads\\pf2_0' + str( LOCAL_VERSION ) + '-0' + str( SERVER_VERSION ) + '.patch'
+        diff_path = os.path.join( userpaths.get_downloads(), 'pf2_0' + str( LOCAL_VERSION ) + '-0' + str( SERVER_VERSION ) + '.patch' )
     else:
         diff_path = os.path.join( os.path.expanduser('~/Downloads/pf2_0' + str( LOCAL_VERSION ) + '-0' + str( SERVER_VERSION ) + '.patch' ) ) 
 
@@ -340,14 +342,17 @@ def start() -> None:
             return
         # Needs update, download and extract the latest build and apply changes 
         case UpdateCode.NEEDS_UPDATE: 
+            if not message.message_yes_no( 'There is a new Pre-Fortress 2 update available. Do you wish to update?' ):
+                print( 'no consent' )
+                return
             if not download():
-                print('no download')
+                print( 'no download' )
                 return
             if not extract():
-                print('no extract')
+                print( 'no extract' )
                 return
             if not update():
-                print('no update')
+                print( 'no update' )
                 return
         # The update was interrupted, continue
         case UpdateCode.NEEDS_UPDATE_INTERRUPTED:
