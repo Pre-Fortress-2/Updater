@@ -1,0 +1,4 @@
+Requests==2.32.3
+tqdm==4.66.4
+unidiff==0.7.5
+vpk==1.4.0
