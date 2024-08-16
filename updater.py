@@ -328,7 +328,7 @@ def cleanup() -> None:
     '''
     sourcemod_path = os.path.join( SOURCEMOD_PATH, 'pf2' )
     os.remove( os.path.join( sourcemod_path, 'update_file' ) )
-    os.remove( os.path.join( TEMP_PATH, 'pf2_new' ) ) 
+    #os.remove( os.path.join( TEMP_PATH, 'pf2_new' ) ) 
     
 
 def start() -> None:
