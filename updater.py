@@ -76,7 +76,7 @@ def setupsourcemodpath() -> None:
                 for _, line in enumerate(file):
                     if 'SourceModInstallPath' in line:
                         # If we find it, replace the paths with proper slashes for UNIX systems
-                        sourcepath = line[line.index('/home'):-1].replace(r'\\', '/')
+                        sourcepath = line[line.index('/home'):-1].replace(r'\\', '/').replace('\"', '')
                         break
                 # Close the file. We're done here.
                 file.close()
@@ -326,10 +326,11 @@ def copy_to_destination( destination_path: str ) -> bool:
 
 def cleanup() -> None:
     '''
+    TODO: Rewrite this function because it calls for some files that may or may not exist
     Function to clean up some files after we're done with them
     '''
-    sourcemod_path = os.path.join( SOURCEMOD_PATH, 'pf2' )
-    os.remove( os.path.join( sourcemod_path, 'update_file' ) )
+    #sourcemod_path = os.path.join( SOURCEMOD_PATH, 'pf2' )
+    #os.remove( os.path.join( sourcemod_path, 'update_file' ) )
     #os.remove( os.path.join( TEMP_PATH, 'pf2_new' ) ) 
     
 
@@ -380,7 +381,7 @@ def start() -> None:
                     return
                 
     # Clean up the files we left behind if any
-    cleanup()
+    #cleanup()
 
 
 if __name__ == "__main__":
