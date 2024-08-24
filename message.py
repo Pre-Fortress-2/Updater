@@ -11,3 +11,14 @@ def message_yes_no( msg: str ) -> bool:
     else:
         print( 'Invalid response.' )
         return False
+    
+def message_options( question: str, *answers : str ) -> int:
+    print( question )
+    for idx, ans in enumerate( answers ):
+        print( str(idx + 1) + '. ', ans )
+    
+    result = int( input() )
+    if result > len( answers ) or result < 0:
+        return -1 # Failed.
+
+    return result
