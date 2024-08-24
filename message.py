@@ -1,5 +1,8 @@
+'''
+Extremely simple message library used in this project so I don't have to type out all of these
+'''
 import os
-
+from globals import DEBUG
 
 def message_yes_no( msg: str ) -> bool:
     msg += ' Y/N\n' #append this to it
@@ -22,3 +25,7 @@ def message_options( question: str, *answers : str ) -> int:
         return -1 # Failed.
 
     return result
+
+def print_exception_error_dbg( err: Exception ) -> None:
+    if DEBUG:
+        print( "An exception occurred: ", err )
