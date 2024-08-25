@@ -13,6 +13,8 @@ import unidiff
 from shutil import copy2, rmtree, move
 from enum import Enum
 
+#import rich # remember to import rich so that we can have pretty text or something IDK
+
 import message
 import vars
 import util
@@ -274,6 +276,7 @@ if __name__ == "__main__":
     
     # Start this in a loop
     while True:
+        
         # Start the program if we executed this script 
         # Get the answer of this message.
         result = message.message_options( 'Welcome to the Pre-Fortress 2 Updater! What would you like to do today?', 
@@ -282,20 +285,25 @@ if __name__ == "__main__":
                                 'Exit' )
         # Get the result
         match result:
-            case 1: # Check for an update.
+            case 1: # Check for updates
                 match check_for_update():
                     case UpdateCode.UPDATE_NO: # We don't need an update.
                         print( 'Your game is up to date.' )
                         continue
                     case UpdateCode.UPDATE_YES: # We do need an update.
+                        # Print the versions: the local version and the server's version
                         print( 'Current version: ', vars.LOCAL_VERSION_STRING )
                         print( 'Latest version: ', vars.SERVER_VERSION_STRING )
                         if message.message_yes_no( 'Your game is out of date. Do you wish to update?' ):
+                            # If yes, start doing stuff
+                            # Download the tar file
                             download()
+                            # Extract the tar file
                             extract()
+                            # Apply the update via the diff
                             update()
                         else:
-                            continue
+                            continue # Give the user a menu.
                         break
                     case UpdateCode.UPDATE_INTERRUPTED: # An update was interrupted.
                         print( 'It appears an update was interrupted. Continuing...' )
@@ -304,24 +312,24 @@ if __name__ == "__main__":
                     case UpdateCode.UPDATE_GAME_NOT_INSTALLED: # Game was not installed.
                         print( 'Pre-Fortress 2 was not detected on your computer. Please select the option \'Install the game\' to install it.' ) 
                         continue
-            case 2:
+            case 2: # Install the game
+                # Check if we have a game installation...
                 if util.check_game_installation():
+                    # Warn the user before prompting them to reinstall the game
                     print( 'WARNING: REINSTALLING WILL DELETE EVERYTHING FROM YOUR PRE-FORTRESS 2 INSTALL!!!' )
                     if message.message_yes_no( 'You appear to already have Pre-Fortress 2 installed. Do you wish to reinstall it?' ):
                         print('Got it. Downloading Pre-Fortress 2.')
                         download()
                         extract()
                         move_to_destination( os.path.join( vars.SOURCEMOD_PATH, 'pf2' ) )
-                        break
+                        break # Clean up.
                     else:
-                        continue
-            case 3:
-                break
+                        continue # ask again.
+            case 3: # Exit
+                break # we exited, get out of here lol
             case default:
                 print( 'Invalid option.')
                 continue
-
-
 
     # Clean up the files we left behind if any
     cleanup()
