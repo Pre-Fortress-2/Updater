@@ -22,3 +22,7 @@ SOURCEMOD_PATH = ''
 LOCAL_VERSION = 0
 # Latest build on server
 SERVER_VERSION = 0
+
+# Versions in string form.
+LOCAL_VERSION_STRING = ''
+SERVER_VERSION_STRING = ''
