@@ -3,8 +3,16 @@ from shutil import rmtree
 from platform import system
 if system() == 'Windows':
     import winreg
-
+from dataclasses import dataclass
 import vars
+
+# structure of an update file.
+@dataclass
+class UpdateInfo:
+    old_version: int # Old version that we're updating from
+    new_version: int # New version that we're being updated to
+    last_file_num: int # Last file that was operated on
+    operation: int # 0 for modified, 1 for removed, 2 for added
 
 def delete_file_if_exists( file_path: str ) -> None:
     '''
@@ -87,3 +95,26 @@ def check_game_installation() -> bool:
             os.path.exists( client_binary_path ) and \
             os.path.exists( gameinfo_path ) and \
             os.path.exists( ctf_2fort_path )
+
+def write_to_update_file( file_path: str, old_version: int, new_version: int, idx: int, operation: int ) -> None:
+    if not os.path.exists( file_path ):
+        return
+    # Write the format as binary to the file_path
+    with open( file_path, 'wb') as file:
+        file.writelines( str(old_version), '', )
+
+
+def parse_update_file( file_path: str ) -> UpdateInfo:
+    if not os.path.exists( file_path ):
+        return None
+    
+    with open( file_path, 'r' ) as update_file:
+        update_info_buffer = update_file.readlines()
+        if not update_info_buffer:
+            return None
+        update_file.close()
+        return UpdateInfo( int( update_info_buffer()[0] ), 
+                        int( update_info_buffer()[1] ), 
+                        update_info_buffer()[2], 
+                        int( update_info_buffer()[3] ) )
+        

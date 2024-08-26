@@ -28,7 +28,14 @@ def message_options( question: str, *answers : str ) -> int:
         print( str( idx + 1 ) + '. ', ans )
     
     # What did the user type? Always expect a number.
-    result = int( input() )
+    result = input()
+
+    # Did the user type a number?
+    if not result.isdigit():
+        return -1
+    
+    # Convert to a number
+    result = int( result )
 
     # If the result is more than the answers or the result is 0, register it as -1
     if result > len( answers ) or result < 0:
