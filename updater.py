@@ -20,12 +20,15 @@ import message
 import vars
 import util
 
+FILE_NAME = 'latest.tar.gz'
+
 # Update codes the check_for_update function will use to do the appropriate action
 class UpdateCode( Enum ):
     UPDATE_NO = 0, # Game is up to date.
     UPDATE_YES = 1, # Game needs an update.
     UPDATE_INTERRUPTED = 2, # Game's update was interrupted somehow, restore
     UPDATE_GAME_NOT_INSTALLED = 3, # Game isn't installed
+
 
 def check_for_update() -> int:
     '''
@@ -63,6 +66,8 @@ def check_for_update() -> int:
         # and remove the periods from the version so that we can store the number
         vars.LOCAL_VERSION_STRING = file.read().decode().format('utf-8').partition('=')[2]
         vars.LOCAL_VERSION = int( vars.LOCAL_VERSION_STRING.replace( '.', '' ) )
+        if len( str( vars.LOCAL_VERSION ) ) < 2: # DOES NOT WORK FOR VERSIONS 1.0.0 AND ABOVE!!
+            vars.LOCAL_VERSION *= 10
         # close the file
         file.close()
     except FileNotFoundError:
@@ -73,10 +78,12 @@ def check_for_update() -> int:
             # Get the version.txt file
             normpath = os.path.join( sourcemod_path, 'version.txt' )
             # Open the file.
-            file = open( normpath )
+            file = open( normpath, 'r' )
             vars.LOCAL_VERSION_STRING = file.read().partition('=')[2]
             # convert this version text to a number.
             vars.LOCAL_VERSION = int( vars.LOCAL_VERSION_STRING.replace( '.', '' ) )
+            if len( str( vars.LOCAL_VERSION ) ) < 2: # DOES NOT WORK FOR VERSIONS 1.0.0 AND ABOVE!!
+                vars.LOCAL_VERSION *= 10
             # close the file.
             file.close()
         except Exception as error:
@@ -92,6 +99,8 @@ def check_for_update() -> int:
         vars.SERVER_VERSION_STRING = response.text.strip('\n')
         response.close()
         vars.SERVER_VERSION = int( vars.SERVER_VERSION_STRING.replace( '.', '' ) )
+        if len( str( vars.SERVER_VERSION ) ) < 2: # DOES NOT WORK FOR VERSIONS 1.0.0 AND ABOVE!!
+            vars.SERVER_VERSION *= 10
         # Is our local version less than the one off the website?
         if vars.LOCAL_VERSION < vars.SERVER_VERSION:
             return UpdateCode.UPDATE_YES # We need to update!!!
@@ -108,7 +117,7 @@ def download() -> bool:
     Downloads the update, True if we downloaded it correctly, False if we didn't
     '''
     print( 'Downloading...' )
-    if vars.DEBUG and os.path.exists( os.path.join( vars.TEMP_PATH, 'latest.tar.gz' ) ):
+    if vars.DEBUG and os.path.exists( os.path.join( vars.TEMP_PATH, FILE_NAME ) ):
         return True
 
     try:
@@ -117,7 +126,7 @@ def download() -> bool:
 
         total_size = int( response.headers.get( 'content-length', 0 ) )
         # show a progress bar to the console using tqdm.
-        with open( os.path.join( vars.TEMP_PATH, 'latest.tar.gz' ), "wb" ) as handle, tqdm( 
+        with open( os.path.join( vars.TEMP_PATH, FILE_NAME ), "wb" ) as handle, tqdm( 
                                                                                 desc='Downloading latest_tar.gz', 
                                                                                 total=total_size,
                                                                                 unit='iB',
@@ -148,7 +157,7 @@ def extract() -> bool:
     success = False
     try:
         # Open the tar file that we just downloaded.
-        with tarfile.open( os.path.join( vars.TEMP_PATH, 'latest.tar.gz' ) ) as file:
+        with tarfile.open( os.path.join( vars.TEMP_PATH, FILE_NAME ) ) as file:
             # Try extracting it
             file.extractall( os.path.join( vars.TEMP_PATH, 'pf2_new' ) )
             # If we extracted it, set the flag for success.
@@ -165,8 +174,6 @@ def extract() -> bool:
     return success
 
 
-
-
 def update( update_info : util.UpdateInfo = None ) -> bool:
     '''
     Try to update the game with the downloaded build 
@@ -174,6 +181,7 @@ def update( update_info : util.UpdateInfo = None ) -> bool:
     This assumes the downloaded game was already extracted and updates files from it.
     '''
     print('Applying the update...')
+
     sourcemod_path = os.path.join( vars.SOURCEMOD_PATH , "pf2" ) 
     # temp path, connect to the internet to get the patch from later
     diff_path = ''
@@ -181,7 +189,7 @@ def update( update_info : util.UpdateInfo = None ) -> bool:
     if system() == 'Windows':
         diff_path = os.path.join( 'E:\\Downloads', 'pf2_0' + str( vars.LOCAL_VERSION ) + '-0' + str( vars.SERVER_VERSION ) + '.patch' )
     else:
-        diff_path = os.path.expanduser('~/Downloads/pf2_0' + str( vars.LOCAL_VERSION ) + '-0' + str( vars.SERVER_VERSION ) + '.patch' ) 
+        diff_path = os.path.expanduser('~/Downloads/pf2_0' + str( vars.LOCAL_VERSION  ) + '-0' + str( vars.SERVER_VERSION ) + '.patch' ) 
 
     replacement_path = os.path.join( vars.TEMP_PATH, 'pf2_new', 'pf2' ) # Build we just downloaded in the temp path
 
@@ -193,54 +201,75 @@ def update( update_info : util.UpdateInfo = None ) -> bool:
         except Exception as error:
            message.print_exception_error_dbg( error )
 
-    # File to keep track of where to start again if we get interrupted
-
-    update_file = None
-    try: 
-        update_file = open( os.path.join( sourcemod_path, 'update_file' ), 'wb' ) 
-    except Exception as error:
-        message.print_exception_error_dbg( error )
-    
     success = False
     try:
         with open( diff_path, 'r' ) as file:
             diff_file = unidiff.PatchSet( file, metadata_only=True )
             for idx, mod_file in enumerate( diff_file.modified_files ):
                 # Get the relative path so we can easily join the new folder with the old folder.
+                # If we're continuing from where we started, check the last thing we were on
                 if update_info:
                     if update_info.operation != 0:
                         break
-                    if not update_info.last_file_num >= idx:
+                    if idx < update_info.last_file_num:
                         continue
                 relative_path = mod_file.path.partition( '/' )[2].partition('/')[2]
+
+                util.write_to_update_file( vars.LOCAL_VERSION, vars.SERVER_VERSION, idx, 0 )
+
+                replace_path = os.path.join( replacement_path, relative_path )
+                install_path = os.path.join( sourcemod_path, relative_path )
+                if not os.path.exists( replace_path ):
+                    if vars.DEBUG:
+                        update_dbg_log.write( "Removed: " + relative_path + '\n' )
+                    os.remove( install_path )
+                    continue
+
                 if vars.DEBUG:
                     update_dbg_log.write( "Modified: " + relative_path + '\n' )
                 # Update this file with the replacement one
                 copy2( os.path.join( replacement_path, relative_path ), os.path.join( sourcemod_path, relative_path ) )
             for idx, rem_file in enumerate( diff_file.removed_files ):
                 # Get the relative path so we can easily join the new folder with the old folder.
+                # If we're continuing from where we started, check the last thing we were on
                 if update_info:
                     if update_info.operation != 1:
                         break
-                    if not update_info.last_file_num >= idx:
+                    if idx < update_info.last_file_num:
                         continue
                 relative_path = rem_file.path.partition( '/' )[2].partition('/')[2]
+
+                replace_path = os.path.join( replacement_path, relative_path )
+                install_path = os.path.join( sourcemod_path, relative_path )
+
                 # Remove this file.
                 if vars.DEBUG:
                     update_dbg_log.write( "Removed: " + relative_path + '\n' ) 
+
+                util.write_to_update_file( vars.LOCAL_VERSION, vars.SERVER_VERSION, idx, 1 )
                 os.remove( os.path.join( sourcemod_path, relative_path ) )
             for idx, added_file in enumerate( diff_file.added_files ):
+                # If we're continuing from where we started, check the last thing we were on
                 if update_info:
                     if update_info.operation != 2:
                         break
-                    if not update_info.last_file_num >= idx:
+                    if idx < update_info.last_file_num:
                         continue
                 # Get the relative path so we can easily join the new folder with the old folder.
                 relative_path = added_file.path.partition( '/' )[2].partition('/')[2]
+                
                 if vars.DEBUG:
                     update_dbg_log.write( "Added: " + relative_path + '\n' ) 
+                util.write_to_update_file( vars.LOCAL_VERSION, vars.SERVER_VERSION, idx, 2 )
+
+                replace_path = os.path.join( replacement_path, relative_path )
+                install_path = os.path.join( sourcemod_path, relative_path )
+
+                if not os.path.exists( os.path.join( install_path, '../' ) ):
+                    os.mkdir( os.path.join( install_path, '../' )  )
+
                 # Add the file
-                copy2( os.path.join( replacement_path, relative_path ), os.path.join( sourcemod_path, relative_path ) )
+                copy2( replace_path, install_path )
             success = True
     except Exception as error:
         message.print_exception_error_dbg( error )
@@ -248,7 +277,6 @@ def update( update_info : util.UpdateInfo = None ) -> bool:
     # Close the update debug log
     if vars.DEBUG:
         update_dbg_log.close()
-    update_file.close()
 
     return success
 
@@ -261,9 +289,16 @@ def continue_update() -> bool:
     sourcemod_path = os.path.join( vars.SOURCEMOD_PATH, 'pf2' )
     # Get the update file so we can continue updating
     update_info = util.parse_update_file( os.path.join( sourcemod_path, 'update_file' ) )
-    if update_info == None:
-        print( 'No files were modified. Starting over.' )
-        
+    if update_info:
+        vars.LOCAL_VERSION = update_info.old_version
+        vars.SERVER_VERSION = update_info.new_version
+    
+    # Check if some files are still there
+    if not os.path.exists( os.path.join( vars.TEMP_PATH, FILE_NAME ) ):
+        download()
+    
+    if not os.path.exists( os.path.join( vars.TEMP_PATH, 'pf2_new' ) ):
+        extract()
 
     # Continue updating.
     return update( update_info=update_info ) 
@@ -296,7 +331,9 @@ def cleanup() -> None:
         sourcemod_path = os.path.join( vars.SOURCEMOD_PATH, 'pf2' )
         util.delete_file_if_exists( os.path.join( sourcemod_path, 'update_file' ) )
         util.delete_folder_if_exists( os.path.join( vars.TEMP_PATH, 'pf2_new' ) ) 
-        util.delete_file_if_exists( os.path.join( vars.TEMP_PATH, 'latest.tar.gz' ) )
+        util.delete_file_if_exists( os.path.join( vars.TEMP_PATH, FILE_NAME ) )
+    
+    util.delete_all_temp_files()
 
 if __name__ == "__main__":
     # set up the sourcemod path global var
@@ -310,6 +347,7 @@ if __name__ == "__main__":
         result = message.message_options( 'Welcome to the Pre-Fortress 2 Updater! What would you like to do today?', 
                                 'Check for updates', 
                                 'Install the game',
+                                'Clear cache files',
                                 'Exit' )
         # Get the result
         match result:
@@ -330,12 +368,16 @@ if __name__ == "__main__":
                             extract()
                             # Apply the update via the diff
                             update()
+                            # Clean up the files we left behind if any
+                            cleanup()
                         else:
                             continue # Give the user a menu.
                         break
                     case UpdateCode.UPDATE_INTERRUPTED: # An update was interrupted.
                         print( 'It appears an update was interrupted. Continuing...' )
                         continue_update()
+                        # Clean up the files we left behind if any
+                        cleanup()
                         break
                     case UpdateCode.UPDATE_GAME_NOT_INSTALLED: # Game was not installed.
                         print( 'Pre-Fortress 2 was not detected on your computer. Please select the option \'Install the game\' to install it.' ) 
@@ -350,14 +392,16 @@ if __name__ == "__main__":
                         download()
                         extract()
                         copy_to_destination( os.path.join( vars.SOURCEMOD_PATH, 'pf2' ) )
+                        # Clean up the files we left behind if any
+                        cleanup()
                         break # Clean up.
                     else:
                         continue # ask again.
-            case 3: # Exit
+            case 3: # Clear cache files
+                util.delete_all_temp_files()
+                print( 'Cleared all cache files.' )
+            case 4: # Exit
                 break # we exited, get out of here lol
             case default:
                 print( 'Invalid option.')
                 continue
-
-    # Clean up the files we left behind if any
-    cleanup()

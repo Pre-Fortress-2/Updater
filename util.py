@@ -5,6 +5,7 @@ if system() == 'Windows':
     import winreg
 from dataclasses import dataclass
 import vars
+from glob import glob
 
 # structure of an update file.
 @dataclass
@@ -96,25 +97,31 @@ def check_game_installation() -> bool:
             os.path.exists( gameinfo_path ) and \
             os.path.exists( ctf_2fort_path )
 
-def write_to_update_file( file_path: str, old_version: int, new_version: int, idx: int, operation: int ) -> None:
-    if not os.path.exists( file_path ):
-        return
+def write_to_update_file( old_version: int, new_version: int, idx: int, operation: int ) -> None:
+    sourcemod_path = os.path.join( vars.SOURCEMOD_PATH , "pf2" ) 
+    update_file_path = os.path.join( sourcemod_path, 'update_file' )
     # Write the format as binary to the file_path
-    with open( file_path, 'wb') as file:
-        file.writelines( str(old_version), '', )
+    with open( update_file_path, 'wb') as file:
+        file.write( old_version.to_bytes( 2 ) + new_version.to_bytes( 2 ) + idx.to_bytes( 2 ) + operation.to_bytes( 2 ))
 
 
 def parse_update_file( file_path: str ) -> UpdateInfo:
     if not os.path.exists( file_path ):
         return None
     
-    with open( file_path, 'r' ) as update_file:
-        update_info_buffer = update_file.readlines()
-        if not update_info_buffer:
-            return None
-        update_file.close()
-        return UpdateInfo( int( update_info_buffer()[0] ), 
-                        int( update_info_buffer()[1] ), 
-                        update_info_buffer()[2], 
-                        int( update_info_buffer()[3] ) )
+    result = []
+    with open( file_path, 'rb' ) as update_file:
+        buf = update_file.read( 2 )
+        result.append( int.from_bytes( buf, byteorder='big' ) )
+        while buf:
+            buf = update_file.read( 2 )
+            result.append( int.from_bytes( buf, byteorder='big' ), )
+    
+    return UpdateInfo( result[0], result[1], result[2], result[3] )
         
+def delete_all_temp_files( ) -> None:
+    sourcemod_path = os.path.join( vars.SOURCEMOD_PATH, 'pf2' )
+    for root, __, files in os.walk( sourcemod_path ):
+        for tmp_file in files:
+            if tmp_file.endswith( '.cache' ) or tmp_file.endswith( '.tmp' ):
+                os.remove( os.path.join( root, tmp_file ) )
