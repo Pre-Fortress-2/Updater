@@ -1,8 +1,8 @@
 '''
 Extremely simple message library used in this project so I don't have to type out all of these
 '''
-import os
 from vars import DEBUG
+import traceback
 
 def message_yes_no( msg: str ) -> bool:
     '''
@@ -20,6 +20,7 @@ def message_options( question: str, *answers : str ) -> int:
     otherwise returns -1.
     '''
     # show the question
+    question += f' (Type {1}-{len(answers)} and press ENTER.) '
     print( question )
 
     # Print the answers along with their corresponding number.
@@ -44,7 +45,7 @@ def message_options( question: str, *answers : str ) -> int:
     # return the result
     return result
 
-def print_exception_error_dbg( err: Exception ) -> None:
+def print_exception_error_dbg() -> None:
     # Print an exception error if the debug flag is on.
     if DEBUG:
-        print( "An exception occurred: ", err )
+        print( traceback.format_exc() )
