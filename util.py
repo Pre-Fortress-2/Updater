@@ -1,3 +1,6 @@
+'''
+Helpful functions used for the updater
+'''
 import os
 from shutil import rmtree
 from platform import system
@@ -8,7 +11,7 @@ import unidiff
 if system() == 'Windows':
     import winreg
     import userpaths # Get the downloads folder on Windows 
-from shutil import rmtree, move, copy2, copytree
+from shutil import rmtree, copy2, copytree
 from dataclasses import dataclass
 import vars
 from vars import UpdateCode # Not writing vars.UpdateCode.UPDATE_YES screw that
@@ -286,19 +289,18 @@ def update( update_info : UpdateInfo = None ) -> bool:
     via a diff file downloaded from the server.
     This assumes the downloaded game was already extracted and updates files from it.
     '''
-    print('Applying the update...')
+    print( 'Applying the update...' )
 
     # temp path, connect to the internet to get the patch from later
     diff_path = ''
     # TEMPORARY TEMPORARY SUPPOSED TO BE PULLED OFF OF A SERVER
     if system() == 'Windows':
-        diff_path = os.path.join( userpaths.get_downloads(), 'pf2_0' + str( get_local_version_num() ).replace( '.', '' ) + '-0' + str( get_server_version_num() ) + '.patch' )
-    else:
+        diff_path = os.path.join( 'E:\\Downloads', 'pf2_0' + str( get_local_version_num() ).replace( '.', '' ) + '-0' + str( get_server_version_num() ) + '.patch' )
+    else: # I hope to god you have a home directory else this will NOT work lol
         diff_path = os.path.expanduser('~/Downloads/pf2_0' + str( get_local_version_num() ).replace( '.', '' ) + '-0' + str( get_server_version_num() ) + '.patch' ) 
 
     # Build we just downloaded in the temp path
     replacement_path = os.path.join( 'pf2_new', 'pf2' ) 
-    
 
     # Debug log file storage
     update_dbg_log = None
@@ -451,23 +453,48 @@ def continue_update() -> bool:
 
 def install() -> bool:
     '''
-    Function to move PF2 into the sourcemods folder if it wasn't installed.
+    Function to install PF2 into the sourcemods folder. If there is already a build there, then
+    the user will be asked if they wish to delete it and install over it. Otherwise, nothing will happen.
     True if it was done successfully, False if something went wrong
     '''
-    print( 'Moving Pre-Fortress 2 to the sourcemods folder...' )
+    print( 'Installing Pre-Fortress 2 to the sourcemods folder...' )
+
     # This is where the extracted contents are. 
     temp_install = os.path.join( 'pf2_new', 'pf2' )
+
+    # success flag to indicate that we did this completely.
     success = False
     try:
         if os.path.exists( vars.GAME_PATH ):
-            if message.message_yes_no( 'WARNING! THE CONTENTS AT PATH \"' + vars.GAME_PATH + '\" WILL BE DELETED! DO YOU WISH TO CONTINUE?' ):
-                #os.mkdir( vars.GAME_PATH )
-                copytree( temp_install, vars.GAME_PATH )
-                success = True
-        else:
-            #os.mkdir( vars.GAME_PATH )
-            copytree( temp_install, vars.GAME_PATH )
+            if message.message_yes_no( 'pf2 will be removed. do you want to delete it or some shit' ):
+                # Delete everything in the folder after consent has been given
+                for file in os.listdir( vars.GAME_PATH ):
+                    # Relative path to the game directory
+                    rel_path = os.path.join( vars.GAME_PATH, file )
+                    # Call the proper removal function if it's a file or directory.
+                    if os.path.isfile( rel_path ):
+                        os.unlink( rel_path )
+                    if os.path.isdir( rel_path ):
+                        rmtree( rel_path )
+
+                # Then we copy the contents to the game directory.
+                for file in os.listdir( temp_install ):
+                    # Relative path to the new downloaded version
+                    rel_path = os.path.join( temp_install, file )
+                    # Destination path to the game path
+                    dest_path = os.path.join( vars.GAME_PATH, file )
+                    # Do the appropriate copy function for a file or directory.
+                    if os.path.isfile( rel_path ):
+                        copy2( rel_path, dest_path )
+                    if os.path.isdir( rel_path ):
+                        copytree( rel_path, dest_path )
+            # Mark that we succeeded
             success = True
+
+        else:
+            # User did not give us consent, consider this a success. 
+            success = True
+            pass
     except Exception:
         message.print_exception_error_dbg()
     
