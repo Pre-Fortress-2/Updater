@@ -66,16 +66,12 @@ def setup_game_path() -> None:
         except Exception:
             message.print_exception_error_dbg()
 
-def get_local_version_num() -> float:
+def get_local_version_num() -> int:
     '''
     Get the server's version in a number. Useful for patch identification and comparisons. 
     '''
-    # If this is the 0.7 hotfix specifically, just return this version.
-    if vars.LOCAL_VERSION_STRING == '0.7-HOTFIX':
-        return 70.1
-
     # Remove the periods from the string, and convert it to a number
-    result = float( vars.LOCAL_VERSION_STRING.replace( '.', '' ) )
+    result = int( vars.LOCAL_VERSION_STRING.replace( '.', '' ).replace( '-HOTFIX', '' ) )
     # If this is a number divisible by 10, add a 0 at the end
     if len( str( result ) ) < 2:
         result *= 10
@@ -227,23 +223,20 @@ def check_for_update() -> int:
     # Added a check for specifically the hotfix. It is always considered out of date for now
     return UpdateCode.UPDATE_YES if get_local_version_num() < get_server_version_num() else UpdateCode.UPDATE_NO     
 
-def download() -> bool: 
+def download_file( url: str ) -> bool:
     '''
-    Downloads the update, True if we downloaded it fully, False if something went wrong
+    Function to download a file off the internet and write it to disk. 
+    True if we were able to fully download the file (HTTP 200 success code), False if we didn't 
     '''
-    print( 'Downloading...' )
-    
-    if vars.DEBUG and os.path.exists( vars.FILE_NAME ):
-        return True
-
     try:
         # Try requesting the server to get a file.
-        response = requests.get( vars.FILE_URL, stream=True, timeout=10 )
+        response = requests.get( url, stream=True, timeout=10 )
 
+        # how big is this file?
         total_size = int( response.headers.get( 'content-length', 0 ) )
         # show a progress bar to the console using tqdm.
-        with open( os.path.join( vars.FILE_NAME ), "wb" ) as handle,    tqdm( 
-                                                                            desc='Downloading latest_tar.gz', 
+        with open( os.path.basename( url ), "wb" ) as handle,    tqdm( 
+                                                                            desc=f'Downloading {os.path.basename( url )}', 
                                                                             total=total_size,
                                                                             unit='iB',
                                                                             unit_scale=True ) as bar:
@@ -258,6 +251,18 @@ def download() -> bool:
 
     # Did we succeed?
     return response.status_code == 200
+
+
+def download() -> bool: 
+    '''
+    Downloads the update's tar file, True if we downloaded it fully, False if something went wrong
+    '''
+    print( 'Downloading...' )
+    
+    if vars.DEBUG and os.path.exists( vars.FILE_NAME ):
+        return True
+
+    return download_file( vars.FILE_URL )
 
 def extract() -> bool:
     '''
@@ -291,14 +296,20 @@ def update( update_info : UpdateInfo = None ) -> bool:
     '''
     print( 'Applying the update...' )
 
-    # temp path, connect to the internet to get the patch from later
-    diff_path = ''
-    # TEMPORARY TEMPORARY SUPPOSED TO BE PULLED OFF OF A SERVER
-    if system() == 'Windows':
-        diff_path = os.path.join( 'E:\\Downloads', 'pf2_0' + str( get_local_version_num() ).replace( '.', '' ) + '-0' + str( get_server_version_num() ) + '.patch' )
-    else: # I hope to god you have a home directory else this will NOT work lol
-        diff_path = os.path.expanduser('~/Downloads/pf2_0' + str( get_local_version_num() ).replace( '.', '' ) + '-0' + str( get_server_version_num() ) + '.patch' ) 
+    # Is this the hotfix version?
+    old_version_hotfix_flag = vars.LOCAL_VERSION_STRING.endswith( '-HOTFIX' )
 
+    # append 1 to the local version num if we're updating from the 0.7 hotfix from an interrupted update
+    hotfix_add = ''
+    if old_version_hotfix_flag:
+        hotfix_add = '1'
+
+    # Download a temp patch file.
+    diff_path = 'pf2_0' + str( get_local_version_num() ).replace( '.', '' ) + hotfix_add + '-0' + str( get_server_version_num() ) + '.patch'
+
+    print( 'Downloading the patch file for temporary usage...' )
+    # Download a patch file, we're gonna use this to patch the game.
+    download_file( f'https://raw.githubusercontent.com/Pre-Fortress-2/Updater/main/{diff_path}' )
     # Build we just downloaded in the temp path
     replacement_path = os.path.join( 'pf2_new', 'pf2' ) 
 
@@ -313,8 +324,6 @@ def update( update_info : UpdateInfo = None ) -> bool:
            message.print_exception_error_dbg()
            update_dbg_log.close()
 
-    # Is this the hotfix version?
-    old_version_hotfix_flag = vars.LOCAL_VERSION_STRING.endswith( '-HOTFIX' )
     # Success flag
     success = False
     try:
@@ -422,6 +431,8 @@ def update( update_info : UpdateInfo = None ) -> bool:
 
     # Delete the update file. We're done with it.
     delete_file_if_exists( os.path.join( vars.GAME_PATH, 'update_file' ) )
+    # Delete that patch file too.
+    delete_file_if_exists( diff_path )
 
     # Close the update debug log
     if vars.DEBUG:
@@ -447,7 +458,11 @@ def continue_update() -> bool:
     # extract if this doesn't exist.
     if not os.path.exists( 'pf2_new' ):
         extract()
-
+    
+    # Add -HOTFIX to the local version we have.
+    if update_info.hotfix_flag:
+        vars.LOCAL_VERSION_STRING += '-HOTFIX' 
+    
     # Continue updating.
     return update( update_info=update_info ) 
 
@@ -515,20 +530,20 @@ def write_to_update_file( hotfix_flag: bool, old_version: int, new_version: int,
     update_file_path = os.path.join( vars.GAME_PATH, 'update_file' )
     # Write the format as binary to the file_path
     with open( update_file_path, 'wb') as file:
-        file.write( hotfix_flag.to_bytes( 2, 'big' ) + old_version.to_bytes( 2, 'big' ) + new_version.to_bytes( 2, 'big' ) + idx.to_bytes( 2, 'big' ) + operation.to_bytes( 2, 'big' ) )
+        file.write( hotfix_flag.to_bytes( 2 ) + old_version.to_bytes( 2 ) + new_version.to_bytes( 2 ) + idx.to_bytes( 2 ) + operation.to_bytes( 2 ) )
 
 def parse_update_file() -> UpdateInfo:
     '''
     Function to parse the update file so that we can continue from where we stopped.
     '''
-    update_file = os.path.join( vars.GAME_PATH, 'update_file' )
+    update_path = os.path.join( vars.GAME_PATH, 'update_file' )
     # How?
-    if not os.path.exists( update_file ):
+    if not os.path.exists( update_path ):
         return None
     # Append the bytes to a list
     result = []
     # Open the update file
-    with open( update_file, 'rb' ) as update_file:
+    with open( update_path, 'rb' ) as update_file:
         # Loop through the file by two bytes
         while byte := update_file.read( 2 ):
             result.append( byte )
