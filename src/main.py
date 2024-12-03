@@ -2,7 +2,7 @@
 Updater for Pre-Fortress 2. Windows and Linux compatible.
 '''
 import os
-import message
+import message as message
 import vars
 from vars import UpdateCode
 import util
@@ -85,6 +85,7 @@ def main() -> None:
                 break
             case default:
                 print( 'Invalid option! Try again.' )
+                
 
 if __name__ == "__main__":
     main()

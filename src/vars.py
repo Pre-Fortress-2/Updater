@@ -6,7 +6,7 @@ from enum import Enum
 DEBUG = True
 
 # Server we're going to extract files from.
-WEBSITE_URL = 'https://archive.prefortress.com/latest/'
+WEBSITE_URL = 'https://dl.prefortress.com/latest/'
 # New PF2 download's file name
 FILE_NAME = 'latest.tar.gz'
 # latest file

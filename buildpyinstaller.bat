@@ -1,1 +1,1 @@
-pyinstaller updater.py
+pyinstaller src/main.py

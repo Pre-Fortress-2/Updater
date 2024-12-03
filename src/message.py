@@ -39,7 +39,7 @@ def message_options( question: str, *answers : str ) -> int:
     result = int( result )
 
     # If the result is more than the answers or the result is 0, register it as -1
-    if result > len( answers ) or result < 0:
+    if result > len( answers ) or result <= 0:
         return -1 # Failed, wrong option.
 
     # return the result

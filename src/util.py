@@ -17,7 +17,7 @@ import vars
 from vars import UpdateCode # Not writing vars.UpdateCode.UPDATE_YES screw that
 import vpk
 import requests
-import message
+import message as message
 
 # structure of an update file.
 @dataclass
@@ -481,7 +481,7 @@ def install() -> bool:
     success = False
     try:
         if os.path.exists( vars.GAME_PATH ):
-            if message.message_yes_no( 'pf2 will be removed. do you want to delete it or some shit' ):
+            if message.message_yes_no( 'WARNING: Pre-Fortess 2 will be removed. Do you wish to continue?' ):
                 # Delete everything in the folder after consent has been given
                 for file in os.listdir( vars.GAME_PATH ):
                     # Relative path to the game directory
@@ -491,28 +491,27 @@ def install() -> bool:
                         os.unlink( rel_path )
                     if os.path.isdir( rel_path ):
                         rmtree( rel_path )
+            else: # If no, return early, the user didn't want to remove the game.
+                return True
+            
+        else: # PF2 wasn't detected, make the pf2 folder
+            os.mkdir( vars.GAME_PATH )
 
-                # Then we copy the contents to the game directory.
-                for file in os.listdir( temp_install ):
-                    # Relative path to the new downloaded version
-                    rel_path = os.path.join( temp_install, file )
-                    # Destination path to the game path
-                    dest_path = os.path.join( vars.GAME_PATH, file )
-                    # Do the appropriate copy function for a file or directory.
-                    if os.path.isfile( rel_path ):
-                        copy2( rel_path, dest_path )
-                    if os.path.isdir( rel_path ):
-                        copytree( rel_path, dest_path )
-            # Mark that we succeeded
-            success = True
-
-        else:
-            # User did not give us consent, consider this a success. 
-            success = True
-            pass
+        # Copy the contents to the game directory.
+        for file in os.listdir( temp_install ):
+            # Relative path to the new downloaded version
+            rel_path = os.path.join( temp_install, file )
+            # Destination path to the game path
+            dest_path = os.path.join( vars.GAME_PATH, file )
+            # Do the appropriate copy function for a file or directory.
+            if os.path.isfile( rel_path ):
+                copy2( rel_path, dest_path )
+            if os.path.isdir( rel_path ):
+                copytree( rel_path, dest_path )
+        # Mark that we succeeded
+        success = True
     except Exception:
         message.print_exception_error_dbg()
-    
     return success
 
 def write_to_update_file( hotfix_flag: bool, old_version: int, new_version: int, idx: int, operation: int ) -> None:
